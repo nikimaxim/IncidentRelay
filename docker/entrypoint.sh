@@ -30,7 +30,13 @@ fi
 # config changes take effect; shared keys the mounted config leaves empty are
 # carried over from the previous copy.
 if [ "$CONFIG_FILE" = "/etc/incidentrelay/incidentrelay.conf" ]; then
-  RUNTIME_CONFIG="/var/lib/incidentrelay/incidentrelay.conf"
+  RUNTIME_CONFIG="${INCIDENTRELAY_RUNTIME_CONFIG_FILE:?runtime config path is required}"
+  # Ownership is repaired only on the data volume before dropping privileges.
+  if [[ ! "$RUNTIME_CONFIG" =~ ^/var/lib/incidentrelay/[^/]+$ ||
+        "${RUNTIME_CONFIG##*/}" == "." || "${RUNTIME_CONFIG##*/}" == ".." ]]; then
+    echo "ERROR: INCIDENTRELAY_RUNTIME_CONFIG_FILE must name a file directly in /var/lib/incidentrelay" >&2
+    exit 1
+  fi
   python - "$CONFIG_FILE" "$RUNTIME_CONFIG" <<'PY_CONFIG'
 import configparser
 import fcntl

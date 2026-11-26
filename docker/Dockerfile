@@ -54,6 +54,7 @@ COPY --chmod=0755 docker/entrypoint.sh /entrypoint.sh
 
 ENV HOME=/home/incidentrelay
 ENV INCIDENTRELAY_CONFIG_FILE=/etc/incidentrelay/incidentrelay.conf
+ENV INCIDENTRELAY_RUNTIME_CONFIG_FILE=/var/lib/incidentrelay/incidentrelay.conf
 ENV INCIDENTRELAY_SERVICE=web
 
 EXPOSE 8080

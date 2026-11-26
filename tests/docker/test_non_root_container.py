@@ -154,6 +154,24 @@ def test_entrypoint_drops_privileges_before_migrations_and_all_services():
     assert syntax.returncode == 0
 
 
+@pytest.mark.parametrize("target", [None, "", "outside.conf", "data/nested/file", "data/../outside", "data/.."])
+def test_bootstrap_rejects_invalid_runtime_path(tmp_path, target):
+    source = tmp_path / "source.conf"
+    source.write_text("[main]\n")
+    data = tmp_path / "data"
+    script = (ROOT / "docker" / "entrypoint.sh").read_text()
+    script = script.replace("/etc/incidentrelay/incidentrelay.conf", str(source))
+    script = script.replace("/var/lib/incidentrelay", str(data))
+    env = {**os.environ, "INCIDENTRELAY_CONFIG_FILE": str(source)}
+    env.pop("INCIDENTRELAY_RUNTIME_CONFIG_FILE", None)
+    if target is not None:
+        env["INCIDENTRELAY_RUNTIME_CONFIG_FILE"] = str(tmp_path / target) if target else ""
+    result = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True)
+    assert result.returncode != 0
+    assert "INCIDENTRELAY_RUNTIME_CONFIG_FILE" in result.stderr
+    assert list(tmp_path.iterdir()) == [source]
+
+
 @pytest.mark.skipif(
     sys.platform != "linux" or os.geteuid() != 0 or shutil.which("setpriv") is None,
     reason="requires root and setpriv for a safe end-to-end bootstrap simulation",
@@ -205,6 +223,7 @@ def test_root_bootstrap_preserves_secrets_and_runs_shell_as_unprivileged_user():
 
         env = os.environ.copy()
         env["INCIDENTRELAY_CONFIG_FILE"] = str(source)
+        env["INCIDENTRELAY_RUNTIME_CONFIG_FILE"] = str(data / "incidentrelay.conf")
         env["INCIDENTRELAY_SERVICE"] = "shell"
         env["INCIDENTRELAY_RUN_MIGRATIONS"] = "0"
         env["HOME"] = str(home)

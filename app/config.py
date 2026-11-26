@@ -14,19 +14,22 @@ _DEFAULT_CONFIG_PATH = "/etc/incidentrelay/incidentrelay.conf"
 def _resolve_config_path():
     """Return the configured config file path, preferring the non-typo env var."""
     value = os.getenv(_CONFIG_ENV)
-    if value:
-        return value
-
-    legacy = os.getenv(_LEGACY_CONFIG_ENV)
+    legacy = os.getenv(_LEGACY_CONFIG_ENV) if not value else None
     if legacy:
         print(
             f"WARNING: environment variable {_LEGACY_CONFIG_ENV} is deprecated "
             f"(typo); please use {_CONFIG_ENV} instead.",
             file=sys.stderr,
         )
-        return legacy
+    configured = value or legacy or _DEFAULT_CONFIG_PATH
+    # docker exec starts with the image environment, not the environment
+    # exported by entrypoint.sh. Use the generated shared config there too,
+    # but never override an explicitly configured custom source path.
+    runtime = os.getenv("INCIDENTRELAY_RUNTIME_CONFIG_FILE")
+    if configured == _DEFAULT_CONFIG_PATH and runtime and os.path.isfile(runtime):
+        return runtime
 
-    return _DEFAULT_CONFIG_PATH
+    return configured
 
 
 CONFIG_FILE = _resolve_config_path()

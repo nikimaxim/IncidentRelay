@@ -69,6 +69,20 @@ def _runtime_config(tmp_path):
     return parser
 
 
+def test_exec_process_reads_generated_secrets_with_image_environment(tmp_path):
+    result = _start(tmp_path, "[main]\nsecret_key =\n")
+    assert result.returncode == 0, result.stderr
+    runtime = tmp_path / "runtime" / "incidentrelay.conf"
+    # docker compose exec does not inherit entrypoint's exported config path.
+    # It sees the original source path and runtime path from the image instead.
+    keys = _effective_keys(runtime, {
+        "INCIDENTRELAY_CONFIG_FILE": "/etc/incidentrelay/incidentrelay.conf",
+        "INCIDENTRELAY_RUNTIME_CONFIG_FILE": str(runtime),
+    })
+    assert keys["secret_key"] == _runtime_config(tmp_path).get("main", "secret_key")
+    assert keys["secret_key"]
+
+
 def _render_runtime_config(tmp_path, source_body, extra_env=None):
     result = _start(tmp_path, source_body, extra_env)
     assert result.returncode == 0, result.stderr
@@ -91,7 +105,7 @@ def _effective_keys(config_path, extra_env):
     result = subprocess.run(
         [sys.executable, "-W", "ignore", "-c", script],
         cwd=ROOT,
-        env=_env({**extra_env, "INCIDENTRELAY_CONFIG_FILE": str(config_path)}),
+        env=_env({"INCIDENTRELAY_CONFIG_FILE": str(config_path), **extra_env}),
         text=True,
         capture_output=True,
         check=True,
